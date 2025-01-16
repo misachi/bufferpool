@@ -332,6 +332,15 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 
 					/* Try next page */
 					key.pageId += uint64(PAGESIZE)
+
+					/* We read in a page that does not meet our requirements. Reset so it can be used by others
+					 * Also relieves some pressure from the bg writer
+					 */
+					if !page.dirty {
+						page.Reset()
+					}
+
+					page.Unlock()
 				}
 			}
 		}
