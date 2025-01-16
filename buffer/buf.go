@@ -80,7 +80,7 @@ func (bp *Buffer) evictPages(numPages int, doSync bool) {
 		}
 		defer page.Unlock()
 
-		if (time.Duration(bp.maxExpireTime) * time.Second) <= currentTime.Sub(page.accessed) {
+		if (time.Duration(bp.maxExpireTime) * time.Second) < currentTime.Sub(page.accessed) {
 			if page.dirty {
 				bp.writePage(page, doSync)
 			} else {
