@@ -213,9 +213,6 @@ func (bp *Buffer) emptyPage(ctx context.Context, key *Key, lockType lock_t) *Pag
 	for {
 		select {
 		case <-ctx.Done():
-			if page != nil {
-				page.Unlock()
-			}
 			log.Println("Timed out while searching for an empty page")
 			return nil
 		default:
@@ -250,9 +247,6 @@ func (bp *Buffer) getPage(ctx context.Context, key *Key, lockType lock_t) *Page 
 	for {
 		select {
 		case <-ctx.Done():
-			if page != nil {
-				page.Unlock()
-			}
 			log.Println("Timed out while retrieving page")
 			return nil
 		default:
@@ -311,9 +305,6 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 	for {
 		select {
 		case <-ctx.Done():
-			if page != nil {
-				page.Unlock()
-			}
 			log.Println("Timed out while searching for page with sufficient space")
 			return nil
 		default:
