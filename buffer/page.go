@@ -126,6 +126,7 @@ func (p *Page) SetKey(key *Key) {
 
 func (p *Page) Lock(lockType lock_t) {
 	p.mu.Lock(lockType)
+	p.accessed = time.Now()
 	p.lockType = lockType
 }
 
@@ -143,6 +144,7 @@ func (p *Page) TryLock(lockType lock_t) bool {
 	locked := p.mu.TryLock(lockType)
 	if locked {
 		p.lockType = lockType
+		p.accessed = time.Now()
 	}
 	return locked
 }
