@@ -371,8 +371,8 @@ func (bp *Buffer) PutRecord(ctx context.Context, key *Key, data *[]byte, timeOut
 	return false
 }
 
+// Caller still needs unlock page when done
 func (bp *Buffer) PutPage(page *Page, doSync bool) error {
 	err := bp.writePage(page, doSync)
-	page.Unlock()
 	return err
 }
