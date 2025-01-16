@@ -153,7 +153,7 @@ func (bp *Buffer) writePage(page *Page, doSync bool) error {
 	return nil
 }
 
-// Page should be locked before `writePage` method is called
+// Page should be locked before `readPage` method is called
 func (bp *Buffer) readPage(page *Page) error {
 	bp.mu.RLock()
 	file, ok := bp.openFiles[page.key.tblId]
