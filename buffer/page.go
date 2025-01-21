@@ -135,7 +135,7 @@ func (p *Page) Lock(lockType lock_t) {
 func (p *Page) Unlock() {
 	lockType := p.lockType // save old
 	p.lockType = NOLOCK
-	if p.lockType == SHARED && p.mu.ReaderCount() >= 1 {
+	if lockType == SHARED && p.mu.ReaderCount() >= 1 {
 		p.lockType = SHARED
 	}
 
