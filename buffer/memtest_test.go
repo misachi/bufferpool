@@ -1,4 +1,4 @@
-package main
+package buffer
 
 // Testing two simple implementations of zeroing a slice:
 // one uses `copy` while another uses a loop. For smaller
@@ -6,11 +6,9 @@ package main
 
 import (
 	"testing"
-
-	bp "github.com/misachi/bufferpool/buffer"
 )
 
-var arr = [bp.PAGESIZE]byte{0}
+var arr = [PAGESIZE]byte{0}
 
 //go:noinline
 func arrCopy(data *[]byte) {
@@ -19,13 +17,13 @@ func arrCopy(data *[]byte) {
 
 //go:noinline
 func arrLoop(data *[]byte) {
-	for i := 0; i < bp.PAGESIZE; i++ {
+	for i := 0; i < PAGESIZE; i++ {
 		(*data)[i] = '0'
 	}
 }
 
 func BenchmarkArrCopy(b *testing.B) {
-	data := make([]byte, bp.PAGESIZE)
+	data := make([]byte, PAGESIZE)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -34,7 +32,7 @@ func BenchmarkArrCopy(b *testing.B) {
 }
 
 func BenchmarkArrLoop(b *testing.B) {
-	data := make([]byte, bp.PAGESIZE)
+	data := make([]byte, PAGESIZE)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
