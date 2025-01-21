@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"sync"
 	"time"
 	"unsafe"
@@ -30,10 +29,6 @@ type Buffer struct {
 }
 
 func NewBuffer(writeDirtyCycle int32, bufSize int64, baseDir string, fileMode, maxExpireTime int32, fs FS) *Buffer {
-	if os.MkdirAll(baseDir, os.FileMode(fileMode)) != nil {
-		log.Fatal("Unable to create base directory")
-	}
-
 	if bufSize < PAGESIZE {
 		log.Fatalf("bufSize=%d cannot be less than pagesize=%d", bufSize, PAGESIZE)
 	}
