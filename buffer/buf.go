@@ -189,9 +189,14 @@ func (bp *Buffer) readPage(page *Page) error {
 
 func (bp *Buffer) Close() {
 	for _, page := range bp.pages {
-		if page.dirty {
-			bp.writePage(page, false)
-		}
+		func() {
+			page.Lock(EXCLUSIVE)
+			defer page.Unlock()
+			if page.dirty && page.hdr.offset > 0 {
+				bp.writePage(page)
+			}
+		}()
+
 	}
 
 	for _, handle := range bp.openFiles {
