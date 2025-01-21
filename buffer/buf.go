@@ -208,6 +208,8 @@ func (bp *Buffer) Close() {
 // in an async manner. Best to be ran as a separate goroutine
 func (bp *Buffer) Run(ctx context.Context) {
 	ticker := time.NewTicker(time.Duration(bp.writeDirtyCycle) * time.Microsecond)
+	defer ticker.Stop() // Not required in Go v1.23 and above
+
 	for {
 		select {
 		case <-ctx.Done():
