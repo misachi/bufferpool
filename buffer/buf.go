@@ -76,8 +76,6 @@ func (bp *Buffer) nextSlot(hash uint32) int {
 }
 
 func (bp *Buffer) evictPages(numPages int, doSync bool) {
-	currentTime := time.Now()
-
 	evictfunc := func(page *Page) bool {
 		ret := false
 		if !page.TryLock(EXCLUSIVE) {
@@ -85,15 +83,20 @@ func (bp *Buffer) evictPages(numPages int, doSync bool) {
 		}
 		defer page.Unlock()
 
+		if page.isFree {
+			return ret
+		}
+		currentTime := time.Now()
+
 		if (time.Duration(bp.maxExpireTime) * time.Second) < currentTime.Sub(page.accessed) {
 			if page.dirty {
-				bp.writePage(page, doSync)
+				bp.writePage(page)
 			} else {
 				page.Reset()
 			}
 			ret = true
 		} else if page.dirty {
-			bp.writePage(page, doSync)
+			bp.writePage(page)
 			ret = true
 		}
 
@@ -142,7 +145,7 @@ func (bp *Buffer) openFile(key *Key) (FS, error) {
 }
 
 // Page should be locked before `writePage` method is called
-func (bp *Buffer) writePage(page *Page, doSync bool) error {
+func (bp *Buffer) writePage(page *Page) error {
 	_file, ok := bp.openFiles[page.key.tblId]
 
 	if !ok {
@@ -387,14 +390,15 @@ func (bp *Buffer) PutRecord(ctx context.Context, key *Key, data *[]byte, timeOut
 	}
 	defer page.Unlock()
 
-	if page.PutRecord(data) && doSync {
-		return bp.writePage(page, doSync) == nil
+	ret := page.PutRecord(data)
+	if ret && doSync {
+		ret = bp.writePage(page) == nil
 	}
-	return false
+	return ret
 }
 
 // Caller still needs unlock page when done
 func (bp *Buffer) PutPage(page *Page, doSync bool) error {
-	err := bp.writePage(page, doSync)
+	err := bp.writePage(page)
 	return err
 }
