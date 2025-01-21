@@ -231,7 +231,6 @@ func (bp *Buffer) Run(ctx context.Context) {
 func (bp *Buffer) emptyPage(ctx context.Context, key *Key, lockType lock_t) *Page {
 	h := key.Hash()
 	slot := bp.slot(h)
-	startPos := slot
 	var page *Page
 
 	for {
@@ -250,13 +249,6 @@ func (bp *Buffer) emptyPage(ctx context.Context, key *Key, lockType lock_t) *Pag
 			}
 
 			slot = bp.nextSlot(uint32(slot))
-
-			if slot == startPos {
-				/* Buffer full? Evict some pages manually(there may be a delay with the background writer)
-				 * and try again if page not found. Assuming, we don't have to do this often
-				 */
-				bp.evictPages(5, true)
-			}
 		}
 	}
 }
