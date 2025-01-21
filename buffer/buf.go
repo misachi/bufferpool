@@ -230,7 +230,7 @@ func (bp *Buffer) emptyPage(ctx context.Context, key *Key, lockType lock_t) *Pag
 		default:
 			if bp.pages[slot].TryLock(lockType) {
 				page = bp.pages[slot]
-				if page.key == nil {
+				if page.isFree {
 					return page
 				}
 				page.Unlock()
@@ -323,7 +323,7 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 			if bp.pages[slot].TryLock(lockType) {
 				page = bp.pages[slot]
 				/* Lest we pick a page that don't belong to us */
-				if page.key != nil && page.key.dbId == key.dbId && page.key.nsId == key.nsId && page.key.tblId == key.tblId {
+				if !page.isFree && page.key.dbId == key.dbId && page.key.nsId == key.nsId && page.key.tblId == key.tblId {
 					if (PAGESIZE - page.hdr.offset) >= size {
 						return page
 					}
@@ -334,16 +334,17 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 			slot = bp.nextSlot(uint32(slot))
 
 			if slot == startPos {
+				/* Try next page */
+				key.pageId += uint64(PAGESIZE)
+
 				page := bp.emptyPage(ctx, key, EXCLUSIVE)
 				if page != nil {
 					page.key = key
 					err := bp.readPage(page)
 					if err == nil && (PAGESIZE-page.hdr.offset) >= size {
+						page.isFree = false
 						return page
 					}
-
-					/* Try next page */
-					key.pageId += uint64(PAGESIZE)
 
 					/* We read in a page that does not meet our requirements. Reset so it can be used by others
 					 * Also relieves some pressure from the bg writer

@@ -48,6 +48,7 @@ type Record struct {
 type Page struct {
 	lockType lock_t
 	dirty    bool
+	isFree   bool
 	hdr      *PageHDR
 	key      *Key
 	mu       *Mutex
@@ -62,6 +63,7 @@ func NewPage(key *Key, mu MutexType) *Page {
 		dirty:    false,
 		key:      key,
 		lockType: NOLOCK,
+		isFree:   true,
 	}
 	page.hdr = (*PageHDR)(unsafe.Pointer(&page.data[0]))
 	page.hdr.size = int32(unsafe.Sizeof(PageHDR{}))
@@ -151,13 +153,11 @@ func (p *Page) TryLock(lockType lock_t) bool {
 
 func (p *Page) Reset() {
 	/* We have to clear the buffer contents to be reused later
-	 * A poor attempt at `memset` behaviour for Go. Slightly better than looping 
+	 * A poor attempt at `memset` behaviour for Go. Slightly better than looping
 	 * for small slices(assuming pages are never that big, 4kb, 8kb, 16kb etc)
 	 */
 	copy(p.data, ZEROBUF[:])
-
-	p.accessed = time.Time{} // Reset time
-	p.dirty = false
-	p.key = nil
-	p.hdr = nil
+	p.isFree = true
+	// p.key = nil
+	// p.hdr = nil
 }
