@@ -111,8 +111,8 @@ func (bp *Buffer) evictPages(numPages int, doSync bool) {
 		}
 	}
 
-	for _, _file := range bp.openFiles {
-		if doSync {
+	if doSync {
+		for _, _file := range bp.openFiles {
 			func() {
 				_file.lock.Lock()
 				defer _file.lock.Unlock()
