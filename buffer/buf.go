@@ -12,13 +12,18 @@ import (
 	"unsafe"
 )
 
+type file struct {
+	file FS
+	lock *sync.RWMutex
+}
+
 type Buffer struct {
 	writeDirtyCycle int32 // How often to write dirty pages
 	maxExpireTime   int32
 	fileMode        int32
 	size            int64
 	mu              *sync.RWMutex // OpenFiles map protection
-	openFiles       map[uint32]FS
+	openFiles       map[uint32]file
 	fsMgr           FS
 	baseDir         string
 	pages           []*Page // Fixed. Should not grow
@@ -39,7 +44,7 @@ func NewBuffer(writeDirtyCycle int32, bufSize int64, baseDir string, fileMode, m
 		fileMode:        fileMode,
 		size:            bufSize,
 		mu:              &sync.RWMutex{},
-		openFiles:       make(map[uint32]FS),
+		openFiles:       make(map[uint32]file),
 		fsMgr:           fs,
 		baseDir:         baseDir,
 	}
@@ -117,7 +122,9 @@ func (bp *Buffer) openFile(key *Key) (FS, error) {
 	}
 
 	bp.mu.Lock()
-	bp.openFiles[key.tblId] = f
+	_file := bp.openFiles[key.tblId]
+	_file.file = f
+	_file.lock = &sync.RWMutex{}
 	bp.mu.Unlock()
 	return f, nil
 }
@@ -156,7 +163,7 @@ func (bp *Buffer) writePage(page *Page, doSync bool) error {
 // Page should be locked before `readPage` method is called
 func (bp *Buffer) readPage(page *Page) error {
 	bp.mu.RLock()
-	file, ok := bp.openFiles[page.key.tblId]
+	_file, ok := bp.openFiles[page.key.tblId]
 	bp.mu.RUnlock()
 
 	if !ok {
@@ -165,10 +172,10 @@ func (bp *Buffer) readPage(page *Page) error {
 		if err != nil {
 			return err
 		}
-		file = f
+		_file.file = f
 	}
 
-	_, err := file.Read(page.data, int64(page.key.pageId))
+	_, err := _file.file.Read(page.data, int64(page.key.pageId))
 	if err != nil {
 		if !errors.Is(err, io.EOF) {
 			return fmt.Errorf("readPage: %v", err)
@@ -186,7 +193,12 @@ func (bp *Buffer) Close() {
 	}
 
 	for _, handle := range bp.openFiles {
-		handle.Close()
+		func() {
+			handle.lock.Lock()
+			defer handle.lock.Unlock()
+
+			handle.file.Close()
+		}()
 	}
 }
 
