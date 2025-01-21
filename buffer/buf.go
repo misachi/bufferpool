@@ -154,7 +154,7 @@ func (bp *Buffer) writePage(page *Page) error {
 		if err != nil {
 			return err
 		}
-		_file, ok = bp.openFiles[page.key.tblId]
+		_file = bp.openFiles[page.key.tblId]
 	}
 
 	_, err := _file.file.Write(page.data, int64(page.key.pageId))
