@@ -346,9 +346,6 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 			slot = bp.nextSlot(uint32(slot))
 
 			if slot == startPos {
-				/* Try next page */
-				key.pageId += uint64(PAGESIZE)
-
 				page := bp.emptyPage(ctx, key, EXCLUSIVE)
 				if page != nil {
 					page.key = key
@@ -361,9 +358,10 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 					/* We read in a page that does not meet our requirements. Reset so it can be used by others
 					 * Also relieves some pressure from the bg writer
 					 */
-					if !page.dirty {
-						page.Reset()
-					}
+					page.Reset()
+
+					/* Try next page */
+					key.pageId += uint64(PAGESIZE)
 
 					page.Unlock()
 				}
