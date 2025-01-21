@@ -110,6 +110,17 @@ func (bp *Buffer) evictPages(numPages int, doSync bool) {
 			break
 		}
 	}
+
+	for _, _file := range bp.openFiles {
+		if doSync {
+			func() {
+				_file.lock.Lock()
+				defer _file.lock.Unlock()
+
+				_file.file.Sync()
+			}()
+		}
+	}
 }
 
 func (bp *Buffer) openFile(key *Key) (FS, error) {
@@ -122,49 +133,40 @@ func (bp *Buffer) openFile(key *Key) (FS, error) {
 	}
 
 	bp.mu.Lock()
-	_file := bp.openFiles[key.tblId]
+	var _file file
 	_file.file = f
 	_file.lock = &sync.RWMutex{}
+	bp.openFiles[key.tblId] = _file
 	bp.mu.Unlock()
-	return f, nil
+	return _file.file, nil
 }
 
 // Page should be locked before `writePage` method is called
 func (bp *Buffer) writePage(page *Page, doSync bool) error {
-	bp.mu.RLock()
-	file, ok := bp.openFiles[page.key.tblId]
-	bp.mu.RUnlock()
+	_file, ok := bp.openFiles[page.key.tblId]
 
 	if !ok {
-		f, err := bp.openFile(page.key)
+		_, err := bp.openFile(page.key)
 
 		if err != nil {
 			return err
 		}
-		file = f
+		_file, ok = bp.openFiles[page.key.tblId]
 	}
 
-	_, err := file.Write(page.data, int64(page.key.pageId))
+	_, err := _file.file.Write(page.data, int64(page.key.pageId))
 	if err != nil {
 		return fmt.Errorf("writePage: %v", err)
 	}
 
-	if doSync {
-		err = file.Sync()
-		if err != nil {
-			return fmt.Errorf("writePage: %v", err)
-		}
-		page.Reset()
-	}
+	page.Reset()
 
 	return nil
 }
 
 // Page should be locked before `readPage` method is called
 func (bp *Buffer) readPage(page *Page) error {
-	bp.mu.RLock()
 	_file, ok := bp.openFiles[page.key.tblId]
-	bp.mu.RUnlock()
 
 	if !ok {
 		f, err := bp.openFile(page.key)
@@ -362,7 +364,7 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 
 // Convienient method to write data to page. Searches for empty page to
 // write to and optionaly syncs page to disk.
-func (bp *Buffer) PutRecord(ctx context.Context, key *Key, data *[]byte, timeOut int32, doWait bool) bool {
+func (bp *Buffer) PutRecord(ctx context.Context, key *Key, data *[]byte, timeOut int32, doSync bool) bool {
 	if timeOut < 1 {
 		timeOut = 1000
 	}
@@ -378,8 +380,8 @@ func (bp *Buffer) PutRecord(ctx context.Context, key *Key, data *[]byte, timeOut
 	}
 	defer page.Unlock()
 
-	if page.PutRecord(data) {
-		return bp.writePage(page, doWait) == nil
+	if page.PutRecord(data) && doSync {
+		return bp.writePage(page, doSync) == nil
 	}
 	return false
 }
