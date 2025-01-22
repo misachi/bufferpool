@@ -141,7 +141,9 @@ func (bp *Buffer) openFile(key *Key) (FS, error) {
 
 // Page should be locked before `writePage` method is called
 func (bp *Buffer) writePage(page *Page) error {
+	bp.mu.RLock()
 	_file, ok := bp.openFiles[page.key.tblId]
+	bp.mu.RUnlock()
 
 	if !ok {
 		_, err := bp.openFile(page.key)
@@ -164,7 +166,9 @@ func (bp *Buffer) writePage(page *Page) error {
 
 // Page should be locked before `readPage` method is called
 func (bp *Buffer) readPage(page *Page) error {
+	bp.mu.RLock()
 	_file, ok := bp.openFiles[page.key.tblId]
+	bp.mu.RUnlock()
 
 	if !ok {
 		f, err := bp.openFile(page.key)
