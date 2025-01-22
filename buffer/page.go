@@ -152,12 +152,5 @@ func (p *Page) TryLock(lockType lock_t) bool {
 }
 
 func (p *Page) Reset() {
-	/* We have to clear the buffer contents to be reused later
-	 * A poor attempt at `memset` behaviour for Go. Slightly better than looping
-	 * for small slices(assuming pages are never that big, 4kb, 8kb, 16kb etc)
-	 */
-	copy(p.data, ZEROBUF[:])
 	p.isFree = true
-	// p.key = nil
-	// p.hdr = nil
 }

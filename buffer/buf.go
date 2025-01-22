@@ -181,7 +181,13 @@ func (bp *Buffer) readPage(page *Page) error {
 			return fmt.Errorf("readPage: %v", err)
 		}
 	}
-	page.hdr = (*PageHDR)(unsafe.Pointer(&page.data[0]))
+	hdr := (*PageHDR)(unsafe.Pointer(&page.data[0]))
+	if hdr.offset > 0 {
+		page.hdr = hdr
+	} else if page.hdr.offset <= 0  {
+		page.hdr.size = int32(unsafe.Sizeof(PageHDR{}))
+		page.hdr.offset = page.hdr.size
+	}
 	return nil
 }
 
@@ -190,7 +196,7 @@ func (bp *Buffer) Close() {
 		func() {
 			page.Lock(EXCLUSIVE)
 			defer page.Unlock()
-			if page.dirty && page.hdr.offset > 0 {
+			if page.dirty && page.hdr != nil && page.hdr.offset > 0 {
 				bp.writePage(page)
 			}
 		}()
@@ -306,8 +312,11 @@ func (bp *Buffer) GetPage(ctx context.Context, key *Key, timeOut int32, lockType
 	return page, nil
 }
 
-func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, size int32) *Page {
+func (bp *Buffer) pageWithSpace(ctx context.Context, k *Key, lockType lock_t, size int32) *Page {
 	// TODO: Need a way keep track of pages with space, instead of just looping through pages in the buffer[Something like FSM in PG but simpler]
+	key := *k
+
+restart:
 	h := key.Hash()
 	slot := bp.slot(h)
 	startPos := slot
@@ -327,31 +336,34 @@ func (bp *Buffer) pageWithSpace(ctx context.Context, key *Key, lockType lock_t, 
 						return page
 					}
 				}
+
+				if page.isFree {
+					/* Use cached page contents with added benefit of not needing to read disk */
+					if page.key != nil && page.key.dbId == key.dbId && page.key.nsId == key.nsId && page.key.tblId == key.tblId {
+						if (PAGESIZE-page.hdr.offset) >= size {
+							page.isFree = false
+							return page
+						}
+					}
+					page.key = &key
+					page.hdr.offset = 0
+					err := bp.readPage(page)
+					if err == nil && (PAGESIZE-page.hdr.offset) >= size {
+						page.isFree = false
+						return page
+					}
+				}
 				page.Unlock()
 			}
 
 			slot = bp.nextSlot(uint32(slot))
 
 			if slot == startPos {
-				page := bp.emptyPage(ctx, key, EXCLUSIVE)
-				if page != nil {
-					page.key = key
-					err := bp.readPage(page)
-					if err == nil && (PAGESIZE-page.hdr.offset) >= size {
-						page.isFree = false
-						return page
-					}
 
-					/* We read in a page that does not meet our requirements. Reset so it can be used by others
-					 * Also relieves some pressure from the bg writer
-					 */
-					page.Reset()
+				/* Try next page and rehash */
+				key.pageId += PAGESIZE
 
-					/* Try next page */
-					key.pageId += uint64(PAGESIZE)
-
-					page.Unlock()
-				}
+				goto restart
 			}
 		}
 	}
